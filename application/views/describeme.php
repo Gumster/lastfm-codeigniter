@@ -74,8 +74,8 @@
 
 <form action="" method="POST">
 	<label for="username">Last.fm username:</label>
-	<input type="text" name="username" /><?php echo form_error('username'); ?>
-	<input type="submit" value="Go" />
+	<input type="text" name="username" />
+	<input type="submit" value="Go" /><?php echo form_error('username'); ?>
 </form>
 <?php if(sizeof($results) > 0) : ?>
 		<p><em><?php echo $username; ?></em>'s musical taste is best described by the word:</p>
