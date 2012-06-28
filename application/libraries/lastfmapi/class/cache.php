@@ -12,7 +12,7 @@ class lastfmApiCache {
 	 * Stores the batabase class
 	 * @var class
 	 */
-	private $db;
+	private $dbconn;
 	/**
 	 * Stores the batabase type
 	 * @var string
@@ -45,61 +45,41 @@ class lastfmApiCache {
 	private $enabled;
 	
 	/**
+	 * Store CI super object
+	*/
+	private $CI;
+	
+
+	/**
 	 * Run when the class is created
 	 * @param array $config The config array
 	 * @uses lastfmApiDatabase
 	 */
 	function __construct($config) {
+		
+		$this->CI =& get_instance();		
+		
 		$this->config = $config;
+		if($this->config['enabled'])
+			$this->enabled = TRUE;
 		
 		if ( isset($this->config['cache_type']) ) {
-			$this->type = $this->config['cache_type'];
+			$this->type = $this->config['cache_type'];			
 		}
 		else {
 			$this->type = 'sqlite';
 		}
 		
-		$this->check_if_enabled();
-		
-		if ( $this->enabled == true ) {
-			if ( $this->type == 'sqlite' ) {
-				require_once 'sqlite.php';				
-				$this->db = new lastfmApiDatabase($this->config['path'].'phplastfmapi');
-			}
-			else {
-				if ( isset($this->config['database']['host']) && isset($this->config['database']['username']) && isset($this->config['database']['password']) && isset($this->config['database']['name']) ) {
-					require_once 'mysql.php';				
-					$this->db = new lastfmApiDatabase($this->config['database']['host'], $this->config['database']['username'], $this->config['database']['password'], $this->config['database']['name']);
-				}
-				else {
-					$this->error = 'Not all mysql database variables were supplied';
-					return false;
-				}
-			}
-			if ( !empty($this->db->error) ) {
-				$this->error = $this->db->error;
-				return false;
-			}
-			else {
-				$this->check_table_exists();
-			}
-			//$this->show_all();
+		// 
+		if ($this->enabled) {
+			
+			$this->dbconn = $this->CI->load->database($this->config['cache_group'], TRUE);			
+
+			$this->check_table_exists();
+
 		}
 	}
 	
-	/**
-	 * Internal method to chack if caching is enabled
-	 * @access private
-	 * @return void
-	 */
-	private function check_if_enabled() {
-		if ( $this->config['enabled'] == true && function_exists('sqlite_open') ) {
-			$this->enabled = true;
-		}
-		else {
-			$this->enabled = false;
-		}
-	}
 	
 	/**
 	 * Internal method to check if the table exists
@@ -107,27 +87,23 @@ class lastfmApiCache {
 	 * @return void
 	 */
 	private function check_table_exists() {
-		if ( $this->type == 'sqlite' ) {
-			$query = "SELECT count(*) FROM sqlite_master WHERE name='cache'";
-			$result = $this->db->query($query);
-			$numbers = $result->fetchAll();
-			if ( $numbers[0]['count(*)'] > 0 ) {
-				// Ok
-			}
-			else {
+		// check tables nicely
+		$result = array();
+
+		if($this->type == 'sqlite') {
+			// add dbprefix
+			$tablename = $this->dbconn->dbprefix . $this->config['cache_table'];
+			$query = "SELECT name FROM sqlite_master WHERE name = '" . $tablename ."';";
+			$result = $this->dbconn->query($query);
+			if($result->num_rows() == 0)
 				$this->create_table();
-			}
 		}
 		else {
-			$query = "show tables like 'cache'";
-			$result = $this->db->query($query);
-			if ( $result->size() > 0 ) {
-				// Ok
-			}
-			else {
+			$result = $this->dbconn->table_exists($this->config['cache_table']);
+			if(!$result)
 				$this->create_table();
-			}
 		}
+		
 	}
 	
 	/**
@@ -142,47 +118,53 @@ class lastfmApiCache {
 		else {
 			$auto_increase = ' AUTO_INCREMENT';
 		}
-		$query = "CREATE TABLE cache (cache_id INTEGER PRIMARY KEY".$auto_increase.", unique_vars TEXT, expires INT, body TEXT)";
-		if ( $this->db->query($query) ) {
-			// Ok
+		// add dbprefix
+		$tablename = $this->dbconn->dbprefix . $this->config['cache_table'];
+		$query = "CREATE TABLE ". $tablename ." (cache_id INTEGER PRIMARY KEY".$auto_increase.", unique_vars TEXT, expires INT, body TEXT)";
+		if ( $this->dbconn->query($query) ) {
+			log_message('info', 'Last.fm cache table '. $tablename .' created');
 		}
 		else {
-			// TODO: Handle error
-			echo $this->db->error;
+			log_message('error', 'Last.fm cache table '.$tablename. ' could not be created');
 		}
 	}
 	
 	/**
-	 * Searches the database for the cahce date. Returns an array if it exists or false if it doesn't 
+	 * Searches the database for the cache date. Returns an array if it exists or false if it doesn't 
 	 * @access public
 	 * @param array $unique_vars Array of variables that are unique to this piece of cached data
 	 * @return string
 	 */
-	public function get($unique_vars) {
-		if ( $this->enabled == true ) {
-			$query = "SELECT expires, body FROM cache WHERE unique_vars='".htmlentities(serialize($unique_vars))."' LIMIT 1";
-			if ( $result = $this->db->query($query) ) {
-				if ( $result->size() > 0 ) {
-					$row = $result->fetch();
-					if ( $row['expires'] < time() ) {
-						$this->del($unique_vars);
+	public function get($unique_vars) 
+	{
+		
+		if($this->enabled == TRUE ) 
+		{
+			$this->dbconn->select('expires, body');
+			$this->dbconn->where('unique_vars', ''. htmlentities(serialize($unique_vars)));
+			$result = $this->dbconn->get($this->config['cache_table'], NULL, 1);
+			if ( $result->num_rows() > 0 ) {
+					$row = $result->row();
+					if ( $row->expires < time() ) 
+					{
+						$this->dbconn->delete($this->config['cache_table'], array('unique_vars' => htmlentities(serialize($unique_vars)) ) );
 						return false;
 					}
-					else {
-						//print_r(unserialize(html_entity_decode($row['body'])));
-						return unserialize(html_entity_decode($row['body']));
+					else 
+					{
+						return unserialize(html_entity_decode($row->body));
 					}
-				}
-				else {
-					return false;
-				}
 			}
-			else {
+			else 
+			{
 				// TODO: Handle error
+				log_message('info', 'Last.fm cache did not find a match '. $unique_vars);
 				return false;
 			}
 		}
-		else {
+		else 
+		{
+			log_message('info', 'Last.fm caching not enabled');
 			return false;
 		}
 	}
@@ -195,10 +177,14 @@ class lastfmApiCache {
 	 * @return boolean
 	 */
 	public function set($unique_vars,  $body) {
-		if ( $this->enabled == true ) {
+		if ( $this->enabled == TRUE ) {
 			$expire = time() + $this->config['cache_length'];
-			$query = "INSERT INTO cache (unique_vars, expires, body) VALUES ('".htmlentities(serialize($unique_vars))."', '".$expire."', \"".htmlentities(serialize($body))."\")";
-			if ( $this->db->query($query) ) {
+			$this->dbconn->set('unique_vars', htmlentities(serialize($unique_vars)));
+			$this->dbconn->set('expires', $expire);
+			$this->dbconn->set('body', htmlentities(serialize($body)) );
+			$this->dbconn->insert($this->config['cache_table']);
+			
+			if ( $this->dbconn->affected_rows() == 1 ) {
 				return true;
 			}
 			else {
@@ -211,46 +197,4 @@ class lastfmApiCache {
 		}
 	}
 	
-	/**
-	 * Internal method to delete unneeded cache data
-	 * @access private
-	 * @param array $unique_vars Array of variables that are unique to this piece of cached data
-	 * @return boolean
-	 */
-	private function del($unique_vars) {
-		$query = "DELETE FROM cache WHERE unique_vars='".htmlentities(serialize($unique_vars))."'";
-		if ( $this->db->query($query) ) {
-			return true;
-		}
-		else {
-			// TODO: Handle error
-			return false;
-		}
-	}
-	
-	/**
-	 * Internal method to show all cached data (used for debugging)
-	 * @access private
-	 * @return boolean
-	 */
-	private function show_all() {
-		$query = "SELECT expires, body FROM cache";
-		if ( $result = $this->db->query($query) ) {
-			if ( $result->size() > 0 ) {
-				$results = $result->fetchAll();
-				echo '<pre>';
-				print_r($results);
-				echo '</pre>';
-			}
-			else {
-				return false;
-			}
-		}
-		else {
-			// TODO: Handle error
-			return false;
-		}
-	}
 }
-
-?>

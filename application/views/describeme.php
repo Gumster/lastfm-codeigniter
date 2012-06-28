@@ -71,7 +71,6 @@
 <div id="container">
 <h1>Describe Last.fm user's tastes</h1>
 <div id="body">
-
 <form action="" method="POST">
 	<label for="username">Last.fm username:</label>
 	<input type="text" name="username" />

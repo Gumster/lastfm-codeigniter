@@ -55,7 +55,7 @@ class Lastfmapi_example extends CI_Controller {
 		$userClass = $this->apiClass->getPackage($this->auth, 'user');
 		// Setup the variables
 		$methodVars = array(
-			'user' => 'rj',
+			'user' => 'Gumstar',
 			'limit' => 5
 		);
 

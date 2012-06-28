@@ -1,9 +1,13 @@
 Last.fm libraries for Codeigniter
 =================================
 
-Nothing fancy here, just a rudimentary hammering of PHP-Last.fm-API (https://github.com/matto1990/PHP-Last.fm-API) into a Codeigniter formula.
+A rudimentary hammering of PHP-Last.fm-API (https://github.com/matto1990/PHP-Last.fm-API) into a Codeigniter formula.
 
-An example controller is supplied, refer to original repository, and of course, Last.fm's API pages for more detail on methods.
+Data base connectivity has been refactored the most to fit Codeigniter's active record methodology and multi-database support.
+
+Developed with Codeigniter 2.2.1, using Sqlite and MySQL.
+
+2 example controllers are supplied, refer to original repository, and of course, Last.fm's API pages for more detail on methods.
 
 M. Diggins
 

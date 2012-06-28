@@ -64,10 +64,11 @@ class lastfmApi {
 	{
 		$this->_obj =& get_instance();
 		$this->_obj->load->config('lastfmapi');
-		
+		// static config values
 		$this->host = $this->_obj->config->item('host');
 		$this->port = $this->_obj->config->item('port');
 		$this->connected = $this->_obj->config->item('connected');
+		$this->enabled = $this->_obj->config->item('cache_enabled');
 	}
 	
 	/*
@@ -77,6 +78,14 @@ class lastfmApi {
 	 */
 	function setup() 
 	{	
+		// setup cache vars 
+		$this->config = array();
+		$this->config['cache_length'] = $this->_obj->config->item('cache_length');
+		$this->config['cache_type'] = $this->_obj->config->item('cache_type');	
+		$this->config['cache_table'] = $this->_obj->config->item('cache_table');
+		$this->config['enabled'] = $this->_obj->config->item('cache_enabled');
+		$this->config['cache_group'] = $this->_obj->config->item('cache_group');
+		
 		$this->socket = new lastfmApiSocket($this->host, $this->port);
 		if ( !$this->socket->error_number && !$this->socket->error_string ) {
 				$this->connected = 1;
@@ -116,8 +125,11 @@ class lastfmApi {
 		catch (Exception $e) {
 			// Crap! We got errors!!!
 			$errors = libxml_get_errors();
-			$error = $errors[0];
-			$this->handleError(95, 'SimpleXMLElement error: '.$e->getMessage().': '.$error->message);
+			$error = (sizeof($errors) > 0) ? $errors[0] : new libxmlerror;
+			$msg = 'undefined libxmlerror';
+			if(!empty($error->message))
+				$msg = $error->message;
+			$this->handleError(95, 'SimpleXMLElement error: '.$e->getMessage().': '.$msg);
 		}
 		
 		if ( !isset($e) ) {
@@ -135,6 +147,7 @@ class lastfmApi {
 		$this->setup();
 
 		if ( $this->connected == 1 ) {
+			
 			$this->cache = new lastfmApiCache($this->config);
 			if ( !empty($this->cache->error) ) {
 				$this->handleError(96, $this->cache->error);
@@ -143,7 +156,7 @@ class lastfmApi {
 			else {
 				if ( $cache = $this->cache->get($vars) ) {
 					// Cache exists
-					$this->response = $cache;
+					$this->response = $cache; 
 				}
 				else {
 					// Cache doesn't exist
@@ -160,7 +173,7 @@ class lastfmApi {
 					$this->response = $this->socket->send($out, 'array');
 					$this->cache->set($vars, $this->response);
 				}
-				
+				// return XML
 				return $this->process_response();
 			}
 		}
@@ -193,7 +206,7 @@ class lastfmApi {
 			$out .= "\r\n";
 			$out .= $data."\r\n";
 			$this->response = $this->socket->send($out, 'array');
-			
+			// return XML
 			return $this->process_response();
 		}
 		else {
