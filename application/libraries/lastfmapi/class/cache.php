@@ -42,7 +42,7 @@ class lastfmApiCache {
 	 * States if caching is enabled or not
 	 * @var boolean
 	 */
-	private $enabled;
+	private $cache_enabled;
 	
 	/**
 	 * Store CI super object
@@ -60,18 +60,21 @@ class lastfmApiCache {
 		$this->CI =& get_instance();		
 		
 		$this->config = $config;
-		if($this->config['enabled'])
-			$this->enabled = TRUE;
-		
-		if ( isset($this->config['cache_type']) ) {
-			$this->type = $this->config['cache_type'];			
+	
+		if(isset($config['cache_enabled']))
+			$this->cache_enabled = $config['cache_enabled'];
+		else
+			$this->cache_enabled = TRUE;
+			
+		if (isset($config['cache_type']) ) {
+			$this->type = $config['cache_type'];			
 		}
 		else {
 			$this->type = 'sqlite';
 		}
 		
 		// 
-		if ($this->enabled) {
+		if ($this->cache_enabled) {
 			
 			$this->dbconn = $this->CI->load->database($this->config['cache_group'], TRUE);			
 
@@ -138,7 +141,7 @@ class lastfmApiCache {
 	public function get($unique_vars) 
 	{
 		
-		if($this->enabled == TRUE ) 
+		if($this->cache_enabled == TRUE ) 
 		{
 			$this->dbconn->select('expires, body');
 			$this->dbconn->where('unique_vars', ''. htmlentities(serialize($unique_vars)));
@@ -177,7 +180,7 @@ class lastfmApiCache {
 	 * @return boolean
 	 */
 	public function set($unique_vars,  $body) {
-		if ( $this->enabled == TRUE ) {
+		if ( $this->cache_enabled == TRUE ) {
 			$expire = time() + $this->config['cache_length'];
 			$this->dbconn->set('unique_vars', htmlentities(serialize($unique_vars)));
 			$this->dbconn->set('expires', $expire);

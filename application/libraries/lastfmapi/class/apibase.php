@@ -68,24 +68,26 @@ class lastfmApi {
 		$this->host = $this->_obj->config->item('host');
 		$this->port = $this->_obj->config->item('port');
 		$this->connected = $this->_obj->config->item('connected');
-		$this->enabled = $this->_obj->config->item('cache_enabled');
 	}
-	
+
+	function setCacheVars()
+	{
+		// setup cache vars 
+		$this->config = array();
+		$this->config['cache_length'] = $this->_obj->config->item('cache_length'); 
+		$this->config['cache_type'] = $this->_obj->config->item('cache_type');	
+		$this->config['cache_table'] = $this->_obj->config->item('cache_table');
+		$this->config['cache_enabled'] = $this->_obj->config->item('cache_enabled');
+		$this->config['cache_group'] = $this->_obj->config->item('cache_group');
+	}
 	/*
 	 * Setup the socket to get the raw api call return
 	 * @access private
 	 * @return boolean
 	 */
 	function setup() 
-	{	
-		// setup cache vars 
-		$this->config = array();
-		$this->config['cache_length'] = $this->_obj->config->item('cache_length');
-		$this->config['cache_type'] = $this->_obj->config->item('cache_type');	
-		$this->config['cache_table'] = $this->_obj->config->item('cache_table');
-		$this->config['enabled'] = $this->_obj->config->item('cache_enabled');
-		$this->config['cache_group'] = $this->_obj->config->item('cache_group');
-		
+	{			
+		$this->setCacheVars();
 		$this->socket = new lastfmApiSocket($this->host, $this->port);
 		if ( !$this->socket->error_number && !$this->socket->error_string ) {
 				$this->connected = 1;
@@ -95,6 +97,7 @@ class lastfmApi {
 			$this->handleError(99, $this->socket->error_string);
 			return false;
 		}
+		
 	}
 	
 	/*
@@ -145,9 +148,15 @@ class lastfmApi {
 	 */
 	protected function apiGetCall($vars) {
 		$this->setup();
-
-		if ( $this->connected == 1 ) {
-			
+		// method vars may over-ride 2 cache settings: cache_length & cache_enabled
+		if(isset($vars['cache_length']))
+			if(is_numeric($vars['cache_length']))
+				$this->config['cache_length'] = $vars['cache_length'];
+		if(isset($vars['cache_enabled']))	
+			$this->config['cache_enabled'] = $vars['cache_enabled'];	
+				
+		if ( $this->connected == 1 ) 
+		{
 			$this->cache = new lastfmApiCache($this->config);
 			if ( !empty($this->cache->error) ) {
 				$this->handleError(96, $this->cache->error);
@@ -260,15 +269,9 @@ class lastfmApi {
 	 * @access public
 	 * @return class
 	 */
-	public function getPackage($auth, $package, $config = '') {
-		if ( $config == '' ) {
-			$config = array(
-				'enabled' => $this->_obj->config->item('enabled'),
-				'path' => $this->_obj->config->item('path'),
-				'cache_length' => $this->_obj->config->item('cache_length')
-			);
-		}
-		
+	public function getPackage($auth, $package, $config = NULL) 
+	{
+
 		if ( is_object($auth) ) {
 			if ( !empty($auth->apiKey) && !empty($auth->secret) && !empty($auth->username) && !empty($auth->sessionKey) && ($auth->subscriber == 0 || $auth->subscriber == 1) ) {
 				$fullAuth = 1;

@@ -30,12 +30,11 @@
 	  will be prepended to the 'cache_table' value.
 	  
 	**/
-	$config['cache_enabled'] = TRUE;
+	$config['cache_enabled'] = TRUE; //  May be over-ridden at method call level
 	$config['cache_type'] = 'sqlite';  // sqlite or db 	
-	$config['cache_length'] = 1800; // seconds
+	$config['cache_length'] = 1800; // In seconds. may be over-ridden at method call level
 	$config['cache_table'] = 'lastfmapicache';	
 	$config['cache_group'] = 'sqlite';
-	
 	// service connection
 	$config['host'] = 'ws.audioscrobbler.com';
 	$config['port'] = 80;
